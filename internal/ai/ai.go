@@ -84,6 +84,10 @@ func (c *Client) Chat(ctx context.Context, msgs []Message) (string, error) {
 	return c.api.Chat(ctx, c.chatModel, msgs)
 }
 
+func (c *Client) Embed(ctx context.Context, text string) ([]float64, error) {
+	return c.api.Embed(ctx, c.embedModel, text)
+}
+
 type sdkClient struct {
 	client *openai.Client
 }

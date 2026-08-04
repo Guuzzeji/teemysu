@@ -15,6 +15,7 @@ type fakeAPI struct {
 	embedVals  []float64
 	embedErr   error
 	embedCalls int
+	embedModel string
 }
 
 type fakeChatCall struct {
@@ -32,6 +33,7 @@ func (f *fakeAPI) Chat(_ context.Context, model string, msgs []Message) (string,
 
 func (f *fakeAPI) Embed(_ context.Context, model, text string) ([]float64, error) {
 	f.embedCalls++
+	f.embedModel = model
 	if f.embedErr != nil {
 		return nil, f.embedErr
 	}
@@ -248,5 +250,76 @@ func TestChatUsesConfiguredModel(t *testing.T) {
 	}
 	if fake.chatCalls[0].model != "my-model" {
 		t.Errorf("model = %q, want %q", fake.chatCalls[0].model, "my-model")
+	}
+}
+
+func TestEmbed(t *testing.T) {
+	want := []float64{0.1, 0.2, 0.3}
+	fake := &fakeAPI{embedVals: want}
+	c := &Client{api: fake, embedModel: "test-model"}
+
+	got, err := c.Embed(context.Background(), "hello")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(got) != len(want) {
+		t.Fatalf("got %d floats, want %d", len(got), len(want))
+	}
+	for i, v := range got {
+		if v != want[i] {
+			t.Errorf("got[%d] = %v, want %v", i, v, want[i])
+		}
+	}
+	if fake.embedCalls != 1 {
+		t.Errorf("embedCalls = %d, want 1", fake.embedCalls)
+	}
+}
+
+func TestEmbedEmptyData(t *testing.T) {
+	fake := &fakeAPI{embedVals: nil}
+	c := &Client{api: fake, embedModel: "test-model"}
+
+	got, err := c.Embed(context.Background(), "hello")
+	if err == nil && got == nil {
+		return
+	}
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(got) != 0 {
+		t.Errorf("got %d floats, want empty", len(got))
+	}
+}
+
+func TestEmbedError(t *testing.T) {
+	wantErr := errors.New("embed failed")
+	fake := &fakeAPI{embedErr: wantErr}
+	c := &Client{api: fake, embedModel: "test-model"}
+
+	got, err := c.Embed(context.Background(), "hello")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !errors.Is(err, wantErr) {
+		t.Errorf("got err %v, want %v", err, wantErr)
+	}
+	if len(got) != 0 {
+		t.Errorf("got %d floats on error, want 0", len(got))
+	}
+}
+
+func TestEmbedUsesConfiguredModel(t *testing.T) {
+	fake := &fakeAPI{embedVals: []float64{1.0}}
+	c := &Client{api: fake, embedModel: "custom-embed-model"}
+
+	_, err := c.Embed(context.Background(), "test")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fake.embedCalls != 1 {
+		t.Fatalf("embedCalls = %d, want 1", fake.embedCalls)
+	}
+	if fake.embedModel != "custom-embed-model" {
+		t.Errorf("model = %q, want %q", fake.embedModel, "custom-embed-model")
 	}
 }
