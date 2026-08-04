@@ -1,0 +1,5 @@
+mkdir -p dist
+go build -o ./dist/bot .
+BUILD_EXIT:0
+BINARY_EXEC:0
+-rwxr-xr-x  1 guzzji  staff  15247362 Aug  3 17:52 ./dist/bot
