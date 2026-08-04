@@ -1,0 +1,76 @@
+{
+  "active_plan": "/Users/guzzji/repos/teemysu/.sisyphus/plans/ai-interface.md",
+  "started_at": "2026-08-04T00:26:11.765Z",
+  "session_ids": [
+    "ses_035f333b2ffevyp9z9ZHqA9Z7H",
+    "ses_035bee86bffeXdKwAMh76prBQi",
+    "ses_035bebf26ffeQdWQ0gVlbfEpCf",
+    "ses_035be91fcffeeV6x3JXnkWkHTY",
+    "ses_035be6c25ffewK74FNvfn0ar52"
+  ],
+  "session_origins": {
+    "ses_035f333b2ffevyp9z9ZHqA9Z7H": "direct",
+    "ses_035bee86bffeXdKwAMh76prBQi": "appended",
+    "ses_035bebf26ffeQdWQ0gVlbfEpCf": "appended",
+    "ses_035be91fcffeeV6x3JXnkWkHTY": "appended",
+    "ses_035be6c25ffewK74FNvfn0ar52": "appended"
+  },
+  "plan_name": "ai-interface",
+  "agent": "atlas",
+  "task_sessions": {
+    "todo:1": {
+      "task_key": "todo:1",
+      "task_label": "1",
+      "task_title": "Initialize Go module + openai-go dependency",
+      "session_id": "ses_035d55944ffentR0jrOqq644Uu",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-08-04T00:27:14.205Z"
+    },
+    "todo:2": {
+      "task_key": "todo:2",
+      "task_label": "2",
+      "task_title": "internal/ai core — types, constructors, model resolution, getters (TDD)",
+      "session_id": "ses_035cea631ffeNJohTP9odPyLT1",
+      "agent": "Sisyphus-Junior",
+      "category": "core-coding",
+      "updated_at": "2026-08-04T00:40:12.299Z"
+    },
+    "todo:3": {
+      "task_key": "todo:3",
+      "task_label": "3",
+      "task_title": "Chat method + tests via fake seam (TDD)",
+      "session_id": "ses_035c6d161ffeJa7jcicgrfXJiz",
+      "agent": "Sisyphus-Junior",
+      "category": "core-coding",
+      "updated_at": "2026-08-04T00:45:21.973Z"
+    },
+    "todo:4": {
+      "task_key": "todo:4",
+      "task_label": "4",
+      "task_title": "Embed method + tests via fake seam (TDD)",
+      "session_id": "ses_035c339abffe2FIBk0m5bHT1Cw",
+      "agent": "Sisyphus-Junior",
+      "category": "core-coding",
+      "updated_at": "2026-08-04T00:48:35.051Z"
+    },
+    "todo:5": {
+      "task_key": "todo:5",
+      "task_label": "5",
+      "task_title": "main.go demo + .env.example + makefile verification",
+      "session_id": "ses_035c072fcffetrq0A2cvxda37h",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-08-04T00:50:23.735Z"
+    },
+    "final-wave:f1": {
+      "task_key": "final-wave:f1",
+      "task_label": "F1",
+      "task_title": "**Plan Compliance Audit** — `oracle`",
+      "session_id": "ses_035be6c25ffewK74FNvfn0ar52",
+      "agent": "Sisyphus-Junior",
+      "category": "deep",
+      "updated_at": "2026-08-04T00:52:03.283Z"
+    }
+  }
+}
