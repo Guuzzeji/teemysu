@@ -2,15 +2,19 @@ package ai
 
 import (
 	"context"
+	"errors"
 	"os"
 	"strings"
 	"testing"
 )
 
 type fakeAPI struct {
-	chatCalls []fakeChatCall
-	chatReply string
-	embedVals []float64
+	chatCalls  []fakeChatCall
+	chatReply  string
+	chatErr    error
+	embedVals  []float64
+	embedErr   error
+	embedCalls int
 }
 
 type fakeChatCall struct {
@@ -20,10 +24,17 @@ type fakeChatCall struct {
 
 func (f *fakeAPI) Chat(_ context.Context, model string, msgs []Message) (string, error) {
 	f.chatCalls = append(f.chatCalls, fakeChatCall{model: model, msgs: msgs})
+	if f.chatErr != nil {
+		return "", f.chatErr
+	}
 	return f.chatReply, nil
 }
 
 func (f *fakeAPI) Embed(_ context.Context, model, text string) ([]float64, error) {
+	f.embedCalls++
+	if f.embedErr != nil {
+		return nil, f.embedErr
+	}
 	return f.embedVals, nil
 }
 
@@ -162,5 +173,80 @@ func TestGetters(t *testing.T) {
 	}
 	if c.EmbedModel() != "embed-xyz" {
 		t.Errorf("EmbedModel() = %q, want %q", c.EmbedModel(), "embed-xyz")
+	}
+}
+
+func TestChat(t *testing.T) {
+	fake := &fakeAPI{chatReply: "hello"}
+	c := &Client{api: fake, chatModel: "gpt-test"}
+
+	got, err := c.Chat(context.Background(), []Message{
+		{Role: RoleUser, Content: "hi"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "hello" {
+		t.Errorf("got %q, want %q", got, "hello")
+	}
+	if len(fake.chatCalls) != 1 {
+		t.Fatalf("expected 1 chat call, got %d", len(fake.chatCalls))
+	}
+}
+
+func TestChatEmptyChoices(t *testing.T) {
+	fake := &fakeAPI{chatReply: ""}
+	c := &Client{api: fake, chatModel: "gpt-test"}
+
+	got, err := c.Chat(context.Background(), []Message{
+		{Role: RoleUser, Content: "hi"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "" {
+		t.Errorf("got %q, want empty string", got)
+	}
+}
+
+func TestChatError(t *testing.T) {
+	wantErr := errors.New("api down")
+	fake := &fakeAPI{chatErr: wantErr}
+	c := &Client{api: fake, chatModel: "gpt-test"}
+
+	_, err := c.Chat(context.Background(), []Message{
+		{Role: RoleUser, Content: "hi"},
+	})
+	if !errors.Is(err, wantErr) {
+		t.Errorf("got err %v, want %v", err, wantErr)
+	}
+}
+
+func TestChatUnknownRole(t *testing.T) {
+	sdk := &sdkClient{client: nil}
+
+	_, err := sdk.Chat(context.Background(), "model", []Message{
+		{Role: "dragon", Content: "roar"},
+	})
+	if err == nil {
+		t.Fatal("expected error for unknown role, got nil")
+	}
+	if !strings.Contains(err.Error(), "unknown role") {
+		t.Errorf("error %q should contain 'unknown role'", err.Error())
+	}
+}
+
+func TestChatUsesConfiguredModel(t *testing.T) {
+	fake := &fakeAPI{chatReply: "ok"}
+	c := &Client{api: fake, chatModel: "my-model"}
+
+	_, err := c.Chat(context.Background(), []Message{
+		{Role: RoleUser, Content: "test"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fake.chatCalls[0].model != "my-model" {
+		t.Errorf("model = %q, want %q", fake.chatCalls[0].model, "my-model")
 	}
 }

@@ -12,3 +12,10 @@
 - `shared.ChatModel` and `EmbeddingModel` are both `= string` aliases — model params accept plain strings
 - `sdkClient` wraps `*openai.Client`; test seam is unexported `api` interface — allows fakeAPI in tests without SDK calls
 - resolveModel intentionally does NOT know env var names — caller constructs error with specific env var name
+
+## 2026-08-04 Task 3: Client.Chat method (TDD)
+- Client.Chat is a one-liner: `c.api.Chat(ctx, c.chatModel, msgs)` — delegates entirely to the api seam
+- fakeAPI needed extension: chatErr/embedErr fields for error injection, embedCalls counter
+- TestChatUnknownRole tests sdkClient directly (not through Client), nil client is safe because role validation happens before API call
+- TestChatEmptyChoices: empty string from fake is valid — Client.Chat doesn't validate content, that's sdkClient's job
+- gopls not available in Go 1.26.5 (only in 1.21.0) — build+tests are verification, no LSP diagnostics

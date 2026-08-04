@@ -80,6 +80,10 @@ func NewWithModels(chatModel, embedModel string) (*Client, error) {
 func (c *Client) ChatModel() string  { return c.chatModel }
 func (c *Client) EmbedModel() string { return c.embedModel }
 
+func (c *Client) Chat(ctx context.Context, msgs []Message) (string, error) {
+	return c.api.Chat(ctx, c.chatModel, msgs)
+}
+
 type sdkClient struct {
 	client *openai.Client
 }
