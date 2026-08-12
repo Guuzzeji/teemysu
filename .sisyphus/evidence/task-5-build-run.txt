@@ -1,0 +1,8 @@
+mkdir -p dist
+go build -o ./dist/bot .
+BUILD_EXIT=0
+BINARY OK
+go run main.go
+chat model: gemma3:1b
+embed model: embeddinggemma
+RUN_EXIT=0
