@@ -17,3 +17,16 @@ run-local: build-local
 
 test:
 	go test $(FTS_TAGS) ./...
+
+# Docker: build image + run via compose (needs .env, cp .env.example .env first).
+docker-build:
+	docker build -t teemysu:latest .
+
+docker-up:
+	docker compose --env-file .env up -d --build
+
+docker-down:
+	docker compose down
+
+docker-logs:
+	docker compose logs -f
