@@ -1,0 +1,14 @@
+.git
+.gitignore
+dist
+data.db
+data.db-*
+.env
+.env.*
+!.env.example
+*.test
+coverage.*
+profile.cov
+Dockerfile
+docker-compose.yml
+.dockerignore
