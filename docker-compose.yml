@@ -1,0 +1,23 @@
+services:
+  bot:
+    build: .
+    image: teemysu:latest
+    container_name: teemysu-bot
+    restart: unless-stopped
+    # Values come from .env (auto-loaded by docker compose); `:?` = fail fast
+    # if missing, `:-` = fallback default. Same vars work in Coolify's env UI.
+    environment:
+      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN:?DISCORD_BOT_TOKEN must be set in .env}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-http://localhost:11434/v1}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-ollama}
+      - OPENAI_CHAT_MODEL=${OPENAI_CHAT_MODEL:-gemma3:1b}
+      - OPENAI_EMBED_MODEL=${OPENAI_EMBED_MODEL:-embeddinggemma}
+      # DB always lives on the named volume.
+      - DATABASE_PATH=/data/data.db
+    volumes:
+      - bot-data:/data
+
+# Named volume is created automatically on first `docker compose up`;
+# data survives container rebuilds/removal.
+volumes:
+  bot-data:
