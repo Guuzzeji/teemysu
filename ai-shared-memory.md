@@ -13,4 +13,10 @@
 
 ## Notes
 
-<!-- Add any additional notes here -->
+- **2026-08-11:discord interface core** Added the Discord bot layer tying db + ai together (`discord/bot.go`, entrypoint in `main.go`). Decisions:
+  - **Dependency**: added `github.com/bwmarrin/discordgo v0.29.0` (already a declared project dependency). Intents = `IntentGuildMessages | IntentMessageContent` (MessageContent needed so `ReferencedMessage` is populated for reply-chaining).
+  - **Schema additions**: `mark_table.channel_id` (needed for correct jump links: `discord.com/channels/{guild}/{channel}/{msg}` — guild resolved via `State.Channel`, falls back to `@me` for DMs); `chat_summary_table.discord_thread_id UNIQUE` (maps a Discord thread → RAG session so plain in-thread messages continue the chat without commands). NOTE: `CREATE TABLE IF NOT EXISTS` won't migrate existing dev DBs — delete `data.db` to rebuild.
+  - **Content location convention**: `content_loc` / vector `content_loc` = the Discord message ID (or thread channel ID for `!chat`). Search results resolve back via `GetMarkByDiscordID`.
+  - **Resilience order**: `SaveMark` first, then vector + tags best-effort — bookmarks survive an AI/embedding outage.
+  - **Command surface**: `!b/!bookmark` (manual comma tags), `!b-auto/!bookmark-auto` (LLM tags, 1-5, grounded in existing tags via `GetTagBaseline`), `!bi/!bookmark-inherit` (reply to a bookmark → saves new text, links via `msg_reference_id`, inherits ALL parent tags without retyping), reply-chaining (`!b`/`!b-auto` replying to a bookmark also inherits tags), `!s/!search` (top-10 vector results as embed with jump links), `!chat` (creates thread named after the prompt, bookmarks the thread, RAG chat; thread auto-archives after 60 min), `!h/!help`.
+  - **Open / watch**: `.env.example` now documents `DISCORD_BOT_TOKEN` + `DATABASE_PATH`. `vec_table` uses `float[768]` to match the `embeddinggemma` model (was 1536 for OpenAI models). Existing dev DBs created with 1536 must be deleted + rebuilt. Logging via stdlib `log` (no deps): main.go startup/shutdown, discord layer logs every command dispatch, bookmark saves (mark id, tags, inherited), search result counts, chat session creation, and failures. `main.go` loads `.env` via `github.com/joho/godotenv` (added dep); `make run-local` builds + runs the bot.
