@@ -25,6 +25,7 @@ type Mark struct {
 	MarkID         int64
 	MsgContent     string
 	DiscordMsgID   string
+	ChannelID      string
 	MsgReferenceID *int64
 	CreatedAt      time.Time
 }
@@ -58,6 +59,12 @@ type VectorResult struct {
 	Distance   float64
 }
 
+// TagExample pairs a unique tag with a sample of the text it was applied to.
+type TagExample struct {
+	Tag     string
+	Example string
+}
+
 func New(path string) (*Store, error) {
 	vecOnce.Do(func() { sqlite_vec.Auto() })
 
@@ -78,7 +85,7 @@ func New(path string) (*Store, error) {
 
 func (s *Store) Close() error { return s.db.Close() }
 
-func (s *Store) SaveMark(ctx context.Context, content, discordMsgID string, referenceID *int64) (int64, error) {
+func (s *Store) SaveMark(ctx context.Context, content, discordMsgID, channelID string, referenceID *int64) (int64, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, err
@@ -86,8 +93,8 @@ func (s *Store) SaveMark(ctx context.Context, content, discordMsgID string, refe
 	defer tx.Rollback()
 
 	res, err := tx.ExecContext(ctx,
-		`INSERT INTO mark_table (msg_content, discord_msg_id, msg_reference_id) VALUES (?, ?, ?)`,
-		content, discordMsgID, referenceID,
+		`INSERT INTO mark_table (msg_content, discord_msg_id, channel_id, msg_reference_id) VALUES (?, ?, ?, ?)`,
+		content, discordMsgID, channelID, referenceID,
 	)
 	if err != nil {
 		return 0, err
@@ -105,9 +112,18 @@ func (s *Store) SaveMark(ctx context.Context, content, discordMsgID string, refe
 func (s *Store) GetMark(ctx context.Context, markID int64) (Mark, error) {
 	var m Mark
 	err := s.db.QueryRowContext(ctx,
-		`SELECT mark_id, msg_content, discord_msg_id, msg_reference_id, created_at FROM mark_table WHERE mark_id = ?`,
+		`SELECT mark_id, msg_content, discord_msg_id, channel_id, msg_reference_id, created_at FROM mark_table WHERE mark_id = ?`,
 		markID,
-	).Scan(&m.MarkID, &m.MsgContent, &m.DiscordMsgID, &m.MsgReferenceID, &m.CreatedAt)
+	).Scan(&m.MarkID, &m.MsgContent, &m.DiscordMsgID, &m.ChannelID, &m.MsgReferenceID, &m.CreatedAt)
+	return m, err
+}
+
+func (s *Store) GetMarkByDiscordID(ctx context.Context, discordMsgID string) (Mark, error) {
+	var m Mark
+	err := s.db.QueryRowContext(ctx,
+		`SELECT mark_id, msg_content, discord_msg_id, channel_id, msg_reference_id, created_at FROM mark_table WHERE discord_msg_id = ?`,
+		discordMsgID,
+	).Scan(&m.MarkID, &m.MsgContent, &m.DiscordMsgID, &m.ChannelID, &m.MsgReferenceID, &m.CreatedAt)
 	return m, err
 }
 
@@ -119,15 +135,15 @@ func (s *Store) UpdateMark(ctx context.Context, m Mark) error {
 	defer tx.Rollback()
 
 	if _, err := tx.ExecContext(ctx,
-		`UPDATE mark_table SET msg_content = ?, discord_msg_id = ?, msg_reference_id = ? WHERE mark_id = ?`,
-		m.MsgContent, m.DiscordMsgID, m.MsgReferenceID, m.MarkID,
+		`UPDATE mark_table SET msg_content = ?, discord_msg_id = ?, channel_id = ?, msg_reference_id = ? WHERE mark_id = ?`,
+		m.MsgContent, m.DiscordMsgID, m.ChannelID, m.MsgReferenceID, m.MarkID,
 	); err != nil {
 		return err
 	}
 	return tx.Commit()
 }
 
-func (s *Store) CreateChatSession(ctx context.Context, summary string) (int64, error) {
+func (s *Store) CreateChatSession(ctx context.Context, discordThreadID, summary string) (int64, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, err
@@ -135,8 +151,8 @@ func (s *Store) CreateChatSession(ctx context.Context, summary string) (int64, e
 	defer tx.Rollback()
 
 	res, err := tx.ExecContext(ctx,
-		`INSERT INTO chat_summary_table (summary) VALUES (?)`,
-		summary,
+		`INSERT INTO chat_summary_table (discord_thread_id, summary) VALUES (?, ?)`,
+		discordThreadID, summary,
 	)
 	if err != nil {
 		return 0, err
@@ -149,6 +165,15 @@ func (s *Store) CreateChatSession(ctx context.Context, summary string) (int64, e
 		return 0, err
 	}
 	return id, nil
+}
+
+func (s *Store) GetChatSessionByThread(ctx context.Context, discordThreadID string) (ChatSummary, error) {
+	var cs ChatSummary
+	err := s.db.QueryRowContext(ctx,
+		`SELECT session_id, last_msg_id, summary, created_at, updated_at FROM chat_summary_table WHERE discord_thread_id = ?`,
+		discordThreadID,
+	).Scan(&cs.SessionID, &cs.LastMsgID, &cs.Summary, &cs.CreatedAt, &cs.UpdatedAt)
+	return cs, err
 }
 
 func (s *Store) GetChatSummary(ctx context.Context, sessionID int64) (ChatSummary, error) {
@@ -264,6 +289,30 @@ func (s *Store) GetTagsByLoc(ctx context.Context, contentLoc string) ([]Tag, err
 		tags = append(tags, t)
 	}
 	return tags, rows.Err()
+}
+
+func (s *Store) GetTagBaseline(ctx context.Context) ([]TagExample, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT t.type, m.msg_content
+		 FROM tag_table t
+		 LEFT JOIN mark_table m ON m.mark_id = t.content_id
+		 GROUP BY t.type
+		 ORDER BY t.type`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var examples []TagExample
+	for rows.Next() {
+		var e TagExample
+		if err := rows.Scan(&e.Tag, &e.Example); err != nil {
+			return nil, err
+		}
+		examples = append(examples, e)
+	}
+	return examples, rows.Err()
 }
 
 func (s *Store) SaveVector(ctx context.Context, contentLoc string, embedding []float32) error {

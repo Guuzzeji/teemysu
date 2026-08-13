@@ -38,7 +38,7 @@ func TestMarkCRUD(t *testing.T) {
 	ctx := context.Background()
 
 	ref := int64(7)
-	id, err := s.SaveMark(ctx, "hello world", "msg-1", &ref)
+	id, err := s.SaveMark(ctx, "hello world", "msg-1", "ch-1", &ref)
 	if err != nil {
 		t.Fatalf("save mark: %v", err)
 	}
@@ -47,7 +47,7 @@ func TestMarkCRUD(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get mark: %v", err)
 	}
-	if m.MsgContent != "hello world" || m.DiscordMsgID != "msg-1" || m.MsgReferenceID == nil || *m.MsgReferenceID != 7 {
+	if m.MsgContent != "hello world" || m.DiscordMsgID != "msg-1" || m.ChannelID != "ch-1" || m.MsgReferenceID == nil || *m.MsgReferenceID != 7 {
 		t.Fatalf("unexpected mark: %+v", m)
 	}
 
@@ -69,7 +69,7 @@ func TestChatSession(t *testing.T) {
 	s := newTestStore(t)
 	ctx := context.Background()
 
-	sid, err := s.CreateChatSession(ctx, "initial summary")
+	sid, err := s.CreateChatSession(ctx, "thread-1", "initial summary")
 	if err != nil {
 		t.Fatalf("create session: %v", err)
 	}
@@ -107,6 +107,53 @@ func TestChatSession(t *testing.T) {
 	}
 }
 
+func TestMarkCRUDByDiscordID(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+
+	id, err := s.SaveMark(ctx, "hello", "disc-1", "ch-9", nil)
+	if err != nil {
+		t.Fatalf("save mark: %v", err)
+	}
+
+	m, err := s.GetMarkByDiscordID(ctx, "disc-1")
+	if err != nil {
+		t.Fatalf("get mark by discord id: %v", err)
+	}
+	if m.MarkID != id || m.MsgContent != "hello" || m.ChannelID != "ch-9" {
+		t.Fatalf("unexpected mark: %+v", m)
+	}
+
+	if _, err := s.GetMarkByDiscordID(ctx, "missing"); err == nil {
+		t.Fatalf("expected error for unknown discord id")
+	}
+}
+
+func TestChatSessionThreadLookup(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+
+	sid, err := s.CreateChatSession(ctx, "thread-alpha", "summary alpha")
+	if err != nil {
+		t.Fatalf("create session: %v", err)
+	}
+	if _, err := s.CreateChatSession(ctx, "thread-beta", "summary beta"); err != nil {
+		t.Fatalf("create session: %v", err)
+	}
+
+	cs, err := s.GetChatSessionByThread(ctx, "thread-alpha")
+	if err != nil {
+		t.Fatalf("get by thread: %v", err)
+	}
+	if cs.SessionID != sid || cs.Summary != "summary alpha" {
+		t.Fatalf("unexpected summary: %+v", cs)
+	}
+
+	if _, err := s.GetChatSessionByThread(ctx, "missing"); err == nil {
+		t.Fatalf("expected error for unknown thread")
+	}
+}
+
 func TestTag(t *testing.T) {
 	s := newTestStore(t)
 	ctx := context.Background()
@@ -129,11 +176,51 @@ func TestTag(t *testing.T) {
 	}
 }
 
+func TestTagBaseline(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+
+	m1, err := s.SaveMark(ctx, "building an ftp server in go", "msg-1", "ch-1", nil)
+	if err != nil {
+		t.Fatalf("save mark 1: %v", err)
+	}
+	m2, err := s.SaveMark(ctx, "bookmarks app roadmap", "msg-2", "ch-1", nil)
+	if err != nil {
+		t.Fatalf("save mark 2: %v", err)
+	}
+	for _, tag := range []string{"golang", "ftp"} {
+		if _, err := s.SaveTag(ctx, m1, "msg-1", tag); err != nil {
+			t.Fatalf("save tag %q: %v", tag, err)
+		}
+	}
+	if _, err := s.SaveTag(ctx, m2, "msg-2", "golang"); err != nil {
+		t.Fatalf("save tag golang: %v", err)
+	}
+
+	baseline, err := s.GetTagBaseline(ctx)
+	if err != nil {
+		t.Fatalf("get tag baseline: %v", err)
+	}
+	if len(baseline) != 2 {
+		t.Fatalf("got %d baseline tags, want 2 unique", len(baseline))
+	}
+	byTag := map[string]string{}
+	for _, ex := range baseline {
+		byTag[ex.Tag] = ex.Example
+	}
+	if byTag["ftp"] != "building an ftp server in go" {
+		t.Errorf("ftp example = %q", byTag["ftp"])
+	}
+	if byTag["golang"] == "" {
+		t.Errorf("golang example missing")
+	}
+}
+
 func TestVectorSearch(t *testing.T) {
 	s := newTestStore(t)
 	ctx := context.Background()
 
-	const dim = 1536
+	const dim = 768
 	a := make([]float32, dim)
 	a[0] = 1
 
