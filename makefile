@@ -11,5 +11,9 @@ build-run:
 go-run:
 	go run $(FTS_TAGS) main.go
 
+# Run the built binary (bot loads .env itself via godotenv).
+run-local: build-local
+	./dist/bot
+
 test:
 	go test $(FTS_TAGS) ./...
