@@ -13,6 +13,13 @@
 
 ## Notes
 
+- **2026-08-14:link metadata enrichment** Added webpage metadata enrichment so bookmarked text that contains URLs embeds each page's title/description alongside the user text, improving semantic search. New `internal/discord/metadata.go`. Decisions:
+  - **Scope**: applies to `!b`, `!b-auto`, and `!bi` because all three route through `saveBookmark`, which now embeds `b.enrichText(ctx, text)` instead of raw `text`. Multiple URLs per message are handled (fetched concurrently, total cost bounded by slowest page). `!b-auto` additionally enriches before `generateTags` so the LLM tags the linked pages' topics, not just the typed text.
+  - **No new dependency**: stdlib only. URL extraction via `urlRe` regex; HTTP via `net/http` with an 8s per-request client timeout + 10s overall context timeout; metadata parsed from the HTML with regex (no HTML dep — a `ponytail:` comment marks the ceiling: upgrade if pages render metadata client-side). Reads `og:title`/`og:description`, falls back to `<title>`/`<meta name="description">`. Body capped at 1 MiB via `io.LimitReader`. User-Agent set to `teemysu-bookmark-bot/1.0`.
+  - **Fallback is automatic**: `enrichText` returns the input unchanged when there are no URLs or every fetch fails/yields no metadata, so old behavior is preserved with zero extra branching at call sites.
+  - **Stored form**: the enriched text goes into the vector embedding only; `mark_table.msg_content` still holds the user's original text (what search displays). So semantic recall improves without altering displayed snippets.
+  - **Tests**: `metadata_test.go` covers URL extraction (dedup + trailing punctuation), `parseMeta` (og priority, title/name fallback, empty), fallback on no-URL and unreachable URL (`example.invalid`, RFC 2606 reserved), and a positive case via `httptest` server confirming metadata gets appended.
+
 - **2026-08-11:discord interface core** Added the Discord bot layer tying db + ai together (`discord/bot.go`, entrypoint in `main.go`). Decisions:
   - **Dependency**: added `github.com/bwmarrin/discordgo v0.29.0` (already a declared project dependency). Intents = `IntentGuildMessages | IntentMessageContent` (MessageContent needed so `ReferencedMessage` is populated for reply-chaining).
   - **Schema additions**: `mark_table.channel_id` (needed for correct jump links: `discord.com/channels/{guild}/{channel}/{msg}` — guild resolved via `State.Channel`, falls back to `@me` for DMs); `chat_summary_table.discord_thread_id UNIQUE` (maps a Discord thread → RAG session so plain in-thread messages continue the chat without commands). NOTE: `CREATE TABLE IF NOT EXISTS` won't migrate existing dev DBs — delete `data.db` to rebuild.
