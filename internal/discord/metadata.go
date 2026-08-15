@@ -50,8 +50,10 @@ func (b *Bot) enrichText(ctx context.Context, text string) string {
 	}
 	meta := fetchAllMeta(ctx, urls)
 	if len(meta) == 0 {
+		logger.Printf("metadata enrichment: no metadata for %d urls, fallback to raw text", len(urls))
 		return text
 	}
+	logger.Printf("metadata enrichment: urls=%d metadata=%d text_len=%d", len(urls), len(meta), len(text))
 	var sb strings.Builder
 	sb.WriteString(text)
 	for _, u := range urls {
@@ -105,15 +107,18 @@ func fetchMeta(ctx context.Context, url string) (pageMeta, error) {
 	req.Header.Set("User-Agent", "teemysu-bookmark-bot/1.0")
 	resp, err := metaClient.Do(req)
 	if err != nil {
+		logger.Printf("metadata fetch failed: url=%s err=%v", url, err)
 		return pageMeta{}, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
+		logger.Printf("metadata fetch failed: url=%s status=%d", url, resp.StatusCode)
 		return pageMeta{}, fmt.Errorf("status %d", resp.StatusCode)
 	}
 	// Bound the body so a huge page cannot balloon memory.
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
+		logger.Printf("metadata fetch failed: url=%s read err=%v", url, err)
 		return pageMeta{}, err
 	}
 	return parseMeta(body), nil
