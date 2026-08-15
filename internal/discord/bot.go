@@ -108,7 +108,8 @@ func (b *Bot) bookmarkAuto(ctx context.Context, m *discordgo.MessageCreate, args
 		b.reply(m, "usage: !b-auto <text>")
 		return
 	}
-	tags, err := b.generateTags(ctx, text)
+	// Enrich with page metadata so the LLM tags the linked pages' topics too.
+	tags, err := b.generateTags(ctx, b.enrichText(ctx, text))
 	if err != nil {
 		b.reply(m, "failed to generate tags: "+err.Error())
 		return
@@ -157,7 +158,7 @@ func (b *Bot) saveBookmark(ctx context.Context, m *discordgo.MessageCreate, text
 			return
 		}
 	}
-	if vec, err := b.embedText(ctx, text); err == nil {
+	if vec, err := b.embedText(ctx, b.enrichText(ctx, text)); err == nil {
 		_ = b.store.SaveVector(ctx, m.ID, vec)
 	} else {
 		logger.Printf("saveBookmark: embed failed: %v", err)
